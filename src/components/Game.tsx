@@ -4,13 +4,17 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GAME, NAME_RE } from '@/lib/config';
 import { api, clock, fmt, loadEcho, loadMuted, saveEcho, saveMuted, usePlayer, type FinishRes, type Status } from '@/lib/client';
-import { CAUSES, SEG_LEN, STEP, WORLD_H, ZOOM_TIME, createWorld, newRun, pressJump, releaseJump, releaseSlide, slide, update, type Echo, type Phase } from '@/game/engine';
+import { CAUSES, DOG_X, SEG_LEN, STEP, WORLD_H, ZOOM_TIME, createWorld, newRun, pressJump, releaseJump, releaseSlide, slide, update, type Echo, type Phase } from '@/game/engine';
 import { drawWorld, type RenderMode, type View } from '@/game/render';
 import { getSprites } from '@/game/sprites';
 import { Sound } from '@/game/audio';
 import { BoneIcon, PauseIcon, SpeakerIcon } from './icons';
 
 type Seg = 'gold' | 'green' | 'red';
+/** Narrowest slice of course (world units) any screen shows, so phones get enough reaction time. */
+const MIN_VIEW_W = 520;
+/** Share of the extra height on zoomed-out screens that goes below the ground instead of above it. */
+const GROUND_LIFT = 0.45;
 interface Result {
   ranked: boolean;
   score: number;
@@ -29,7 +33,7 @@ export default function Game() {
   const player = usePlayer();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const world = useRef(createWorld());
-  const view = useRef<View>({ scale: 1, dpr: 1, viewW: 400, top: 0 });
+  const view = useRef<View>({ scale: 1, dpr: 1, viewW: 400, top: 0, left: 0 });
   const sound = useRef<Sound | null>(null);
   const ticket = useRef<{ runId: string; round: number } | null>(null);
 
@@ -209,11 +213,19 @@ export default function Game() {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       cvs.width = Math.max(1, Math.round(r.width * dpr));
       cvs.height = Math.max(1, Math.round(r.height * dpr));
-      // fit the full world height, but zoom in on wide screens (cropping sky off the top)
+      // Fit the full world height, zoom in on wide screens (cropping sky off the top), and on
+      // narrow/portrait screens zoom out so at least MIN_VIEW_W of course is visible (extra sky above).
       const base = r.height / WORLD_H;
       const zoom = Math.min(r.height / 470, r.width / 820);
-      const scale = Math.max(base, zoom) || 1;
-      view.current = { scale, dpr, viewW: r.width / scale, top: Math.max(0, WORLD_H - r.height / scale) };
+      const scale = Math.min(Math.max(base, zoom), r.width / MIN_VIEW_W) || 1;
+      const visibleW = r.width / scale;
+      // narrow screens: pull the dog toward the left edge so more of the course is ahead of it
+      const left = visibleW < 700 ? DOG_X - 28 : 0;
+      // when zoomed out, put some of the extra height below the ground (more street) so the
+      // ground sits about two-thirds down the screen instead of at the very bottom
+      const extraH = Math.max(0, r.height / scale - WORLD_H);
+      const top = WORLD_H - r.height / scale + extraH * GROUND_LIFT;
+      view.current = { scale, dpr, viewW: left + visibleW, top, left };
     };
     const ro = new ResizeObserver(resize);
     ro.observe(cvs);

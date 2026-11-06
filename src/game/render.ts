@@ -1,8 +1,12 @@
 import { DOG_SCALE, DOG_X, GROUND, WORLD_H, hashN, type World } from './engine';
 import type { Sprites } from './sprites';
 
-/** `top` is how many world px are cropped off the top when the camera zooms in on wide screens. */
-export interface View { scale: number; dpr: number; viewW: number; top: number }
+/**
+ * Camera, in world units. The visible area is x from `left` to `viewW` and y from `top` to WORLD_H.
+ * `top` > 0 crops sky when zoomed in on wide screens; `top` < 0 adds sky above when zoomed out on
+ * narrow screens. `left` > 0 shifts the dog toward the left edge so narrow screens see further ahead.
+ */
+export interface View { scale: number; dpr: number; viewW: number; top: number; left: number }
 export type RenderMode = 'home' | 'play' | 'paused' | 'dying' | 'over';
 
 const PIX = '"Press Start 2P", ui-monospace, monospace';
@@ -95,7 +99,7 @@ function ground(ctx: CanvasRenderingContext2D, D: number, viewW: number) {
   ctx.fillRect(-20, GROUND + 72, viewW + 40, 6);
   // street
   ctx.fillStyle = '#1C1E33';
-  ctx.fillRect(-20, GROUND + 78, viewW + 40, WORLD_H - GROUND);
+  ctx.fillRect(-20, GROUND + 78, viewW + 40, WORLD_H - GROUND + 1200); // runs past WORLD_H when the camera shows extra street
   ctx.fillStyle = '#F2B53A';
   const roff = (D * 1.15) % 120;
   for (let i = -1; i < viewW / 120 + 2; i++) ctx.fillRect(Math.round(i * 120 - roff), GROUND + 118, 54, 5);
@@ -112,7 +116,7 @@ export function drawWorld(ctx: CanvasRenderingContext2D, cw: number, ch: number,
   const k = scale * dpr;
   const sx = w.shake > 0 ? ((Math.random() - 0.5) * 14 * w.shake) / 0.35 : 0;
   const sy = w.shake > 0 ? ((Math.random() - 0.5) * 10 * w.shake) / 0.35 : 0;
-  ctx.setTransform(k, 0, 0, k, sx * k, (sy - v.top) * k);
+  ctx.setTransform(k, 0, 0, k, (sx - v.left) * k, (sy - v.top) * k);
   ctx.imageSmoothingEnabled = false;
 
   // dusk sky
@@ -122,18 +126,21 @@ export function drawWorld(ctx: CanvasRenderingContext2D, cw: number, ch: number,
   sky.addColorStop(0.85, '#B8456E');
   sky.addColorStop(1, '#F08A4B');
   ctx.fillStyle = sky;
-  ctx.fillRect(-20, -20, viewW + 40, GROUND + 20);
-  for (const s of STARS) {
-    const x = (((s.x - D * 0.02) % 1200) + 1200) % 1200;
-    if (x > viewW) continue;
-    ctx.globalAlpha = s.o * (0.75 + 0.25 * Math.sin(w.clock * 2 + s.x));
-    ctx.fillStyle = '#F5EFE0';
-    ctx.fillRect(Math.round(x), Math.round(s.y), s.s, s.s);
-  }
+  const skyTop = Math.min(-20, v.top - 20);
+  ctx.fillRect(-20, skyTop, viewW + 40, GROUND - skyTop);
+  // stars, repeated upward when the camera shows extra sky
+  for (let oy = 0; oy > skyTop - 240; oy -= 240)
+    for (const s of STARS) {
+      const x = (((s.x + oy * 3 - D * 0.02) % 1200) + 1200) % 1200;
+      if (x > viewW) continue;
+      ctx.globalAlpha = s.o * (0.75 + 0.25 * Math.sin(w.clock * 2 + s.x));
+      ctx.fillStyle = '#F5EFE0';
+      ctx.fillRect(Math.round(x), Math.round(s.y + oy), s.s, s.s);
+    }
   ctx.globalAlpha = 1;
 
   // striped retro sun
-  const sunX = Math.round(viewW * 0.68);
+  const sunX = Math.round(v.left + (viewW - v.left) * 0.68);
   const sunY = GROUND - 130;
   const sunG = ctx.createLinearGradient(0, sunY - 110, 0, sunY + 110);
   sunG.addColorStop(0, '#FFD27A');
