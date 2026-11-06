@@ -29,8 +29,8 @@ The street gets busier the further you run: hydrants and cones first, then trash
 
 ## Leaderboards
 
-- **This round**: best run per player in the current round.
+- **Bones**: total Bones collected in ranked runs. This is the board you see first.
 - **All time**: best single run per player across every round.
-- **Bones**: total Bones collected in ranked runs.
+- **This round**: best run per player in the current round. It resets every 30 minutes.
 
 Pick a display name before your first ranked run. No account needed.

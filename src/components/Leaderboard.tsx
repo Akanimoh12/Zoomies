@@ -7,14 +7,14 @@ import { api, clock, fmt, usePlayer, type BoardRes } from '@/lib/client';
 import { BoneIcon } from './icons';
 
 const TABS = [
-  { id: 'round', label: 'This round' },
-  { id: 'all', label: 'All time' },
   { id: 'bones', label: 'Bones' },
+  { id: 'all', label: 'All time' },
+  { id: 'round', label: 'This round' },
 ] as const;
 
 export default function Leaderboard() {
   const { id, ready } = usePlayer();
-  const [tab, setTab] = useState<(typeof TABS)[number]['id']>('round');
+  const [tab, setTab] = useState<(typeof TABS)[number]['id']>('bones');
   const [data, setData] = useState<BoardRes | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
